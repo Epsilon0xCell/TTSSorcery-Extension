@@ -8,8 +8,15 @@ import { Handlebars } from "../../../../lib.js";
 const { callPopup } = getContext();
 
 const extensionName = "TTSSorcery";
+// I only run inside SillyTavern. The imports above point at the host by
+// relative path, three and four levels up, so this file cannot load on
+// its own and moving it breaks every import at once.
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 const extensionSettings = extension_settings[extensionName];
+// These defaults only land when the stored settings object is completely
+// empty (see loadSettings). If even one key survived from an older
+// install, the rest stay undefined and the reads further down fall back
+// with || instead.
 const defaultSettings = {
     enabled: false,
     api_key: "",
@@ -27,6 +34,10 @@ const defaultSettings = {
 };
 
 function generateCharacterList() {
+    // I only list variants that actually hold a file. A variant the user
+    // created but never filled would tell the model to ask for a voice
+    // file that does not exist, and playback falls back to default.mp3
+    // in the end anyway.
     const voices = extension_settings[extensionName].voices;
     if (!voices) return '';
 
@@ -47,6 +58,10 @@ function generateCharacterList() {
     return characterList.join('\n');
 }
 
+// This whole block is pasted into the prompt on every generation (see
+// injectInstructions). The model is the unreliable half of this design:
+// if it places a marker wrong, extractTTSInfo finds nothing and the
+// message stays silent. Nothing downstream can recover a bad marker.
 const INSTRUCTIONS_TEMPLATE = `
 -----
 
@@ -105,13 +120,20 @@ function getCurrentInstructions() {
 let instructionsInjected = false;
 let hookInstalled = false;
 
-// Add this variable to track when the page was loaded/refreshed
+// pageLoadTimestamp is written here and in resetExtensionState, and read
+// nowhere else in this file. It is leftover bookkeeping, not a gate that
+// anything checks.
 let pageLoadTimestamp = Date.now();
 
-// Add this variable to track the last processed message
+// lastProcessedMessageId is the dedupe key for auto generation. Once a
+// message id is recorded here, processSegments refuses to speak that
+// message again. The stream hook clears it when a new message starts.
 let lastProcessedMessageId = null;
 
 function injectInstructions(data) {
+    // I push a full user message onto data.chat instead of editing the
+    // system prompt. The prompt ready event hands me the chat array, so
+    // pushing onto it is the lever I actually have here.
     if (!extension_settings[extensionName].enabled) return;
     
     console.log(`${extensionName}: Injecting TTS instructions`);
@@ -128,6 +150,11 @@ function extractTTSInfo(text) {
     console.log("Extracting TTS info from:", text.substring(0, 100) + "...");
     
     const markers = [];
+    // The marker grammar is: section sign, one of n, a, or c, then an
+    // optional :name, an optional |voice file, an optional |emotions,
+    // and a closing section sign. Every group after the type letter is
+    // optional, so a short marker still parses and the defaults below
+    // fill in Narrator and default.mp3.
     const markerRegex = /§([nac])(:([^§|]*))?(\|([^§|]*))?(\|([^§]*))?§/g;
     
     let match;
@@ -216,6 +243,9 @@ function logTTSInfo(markers) {
     });
 }
 
+// Nothing in this file calls fixFormatting. It only logs the markers it
+// finds and squeezes spaces around asterisks and quotes. I leave it here
+// as it is rather than pretend it sits in the live path.
 function fixFormatting(text) {
     const markers = extractTTSInfo(text);
     
@@ -236,6 +266,12 @@ function fixFormatting(text) {
 }
 
 function installStreamHook() {
+    // I wrap the host streaming callback instead of replacing it, and the
+    // wrapper calls the original at the end of every update. Known
+    // weakness: hookInstalled is reset by the generation started handler
+    // and by turning the extension off, but the wrapper itself is never
+    // removed. A reinstall wraps whatever callback is current, which may
+    // already be my wrapper, so the chain can grow across generations.
     if (hookInstalled || !extension_settings[extensionName].enabled) return;
     if (!extension_settings[extensionName].auto_generation) return;
     
@@ -254,10 +290,16 @@ function installStreamHook() {
     streamingProcessor.onProgressStreaming = function(messageId, text, isFinal) {
         console.log(`Stream update: ${text.length} chars, isFinal: ${isFinal}`);
         
-        // Update the timestamp to track fresh content
+        // lastStreamTimestamp is updated here and read nowhere else in
+        // this file. The write stays, the tracking I planned for it was
+        // never built.
         lastStreamTimestamp = Date.now();
         
-        // Reset the last processed message ID when a new message starts
+        // A one character update is my signal that a new message
+        // started. It is a guess about how the host streams: a message
+        // whose first chunk arrives longer than one character never
+        // clears the old id here, and the dedupe in processSegments
+        // decides what happens to it instead.
         if (text.length === 1) {
             lastProcessedMessageId = null;
             console.log("New message streaming started, cleared last processed message ID");
@@ -277,6 +319,10 @@ function installStreamHook() {
             }
         }
         
+        // I only cut segments at an asterisk or a quote followed by a
+        // newline or the end of the text. A paragraph that never closes
+        // its formatting is never cut here. The isFinal branch below
+        // takes whatever is left whole.
         const paragraphEndRegex = /[*"]\s*(?:\n|$)/g;
         let match;
         
@@ -340,6 +386,11 @@ let loadingSegments = new Set();
 let currentPlayingSegmentIndex = -1;
 
 function resetTtsQueue(force = false) {
+    // Every caller in this file passes force as true, which short
+    // circuits the check on the next line. shouldPreserveTtsQueue is not
+    // defined anywhere in this file, so a bare resetTtsQueue() call
+    // would throw a ReferenceError. The preserve branch it was meant to
+    // guard does not exist yet.
     if (force || !shouldPreserveTtsQueue) {
         console.log("Resetting TTS queue and stopping playback");
 
@@ -368,7 +419,9 @@ function resetTtsQueue(force = false) {
     }
 }
 
-// Add a function to completely reset the extension state
+// The chat loaded handlers call this. It is the full reset: queue,
+// injection flag, hook flag, and the dedupe id all go back to their
+// starting values because a new chat must not inherit any of them.
 function resetExtensionState() {
     console.log("Completely resetting TTSSorcery extension state");
     resetTtsQueue(true);
@@ -409,6 +462,9 @@ function processSegments(text, markers) {
         
         // If we're processing a message directly (not through the stream hook),
         // check if it's the latest message
+        // The manual path is recognised by absence: if no message id has
+        // been recorded yet, I assume a button press and let the text
+        // through even when it is not the latest message text.
         const messageIsFromManualButton = !lastProcessedMessageId;
         if (!messageIsFromManualButton && latestMessage && latestMessage.mes !== text) {
             console.log(`Skipping non-latest message. Only processing the most recent response.`);
@@ -425,6 +481,12 @@ function processSegments(text, markers) {
     markers.sort((a, b) => a.position - b.position);
     
     function sanitizeText(text) {
+        // I strip the markup before any text leaves the page.
+        // Asterisks and quotes are stage directions for the reader, not
+        // words for the speaker, so they do not go to the API. The
+        // order matters: the double hyphen rule runs first, the
+        // character strip runs before the hyphen between words rule,
+        // and each later rule only sees what the earlier ones left.
         text = text.replace(/--/g, '—');
         text = text.replace(/[\*\"]/g, '');
         text = text.replace(/\s+/g, ' ');
@@ -597,6 +659,11 @@ function processSegments(text, markers) {
                 }
             }
         } else {
+            // Known bug, found by reading this scope: there is no
+            // variable named emotions in processSegments, so the push
+            // below throws a ReferenceError for narrator markers
+            // instead of queueing the segment. The character and action
+            // branches above pass marker.emotions and do not hit this.
             segments.push({
                 type: marker.type,
                 character: marker.character,
@@ -608,6 +675,10 @@ function processSegments(text, markers) {
         }
     });
 
+    // Returning the segments is only half of what this function does.
+    // It also pushes every segment onto the shared ttsQueue here and
+    // starts playback when the queue is idle, so a caller cannot use it
+    // just to inspect a message without speaking it.
     segments.forEach(segment => {
         console.log(`\n[Streaming Segment]`);
         console.log(`Type: ${segment.type}`);
@@ -735,6 +806,10 @@ function loadAndPlaySegment(index) {
     
     const segment = ttsQueue[index];
 
+    // Segments remember the chat they were built from. If the user
+    // switched chats while audio was still queued, I skip the segment
+    // instead of playing lines from the old chat into the new one. The
+    // preload function below repeats this same check for its own path.
     const currentChatId = getContext().chatId;
     if (segment.chatId && segment.chatId !== currentChatId) {
         console.log(`Skipping segment ${index+1} - chat ID mismatch (segment: ${segment.chatId}, current: ${currentChatId})`);
@@ -847,6 +922,13 @@ function loadAndPlaySegment(index) {
         return;
     }
 
+    // I pad the text with ellipses on both ends before sending it, so
+    // the synthesis has a lead in and a trail off instead of starting
+    // and stopping hard on the words themselves. The guards here stop a
+    // segment that already carries dots from collecting more every time
+    // it passes through this function. This mutates the queued segment,
+    // which is why the guard has to live in the same place as the
+    // padding.
     if (segment.text) {
         if (!segment.text.startsWith('...') && !segment.text.startsWith(' ...')) {
             segment.text = '... ' + segment.text;
@@ -876,6 +958,12 @@ function loadAndPlaySegment(index) {
     }
     
     
+    // The log line below prints the request with speaker_audio replaced
+    // by a marker, so the cloned voice data stays out of the console.
+    // The API key is not part of requestData and is not logged either.
+    // It travels in the X-API-Key header over HTTPS, which is the only
+    // auth this endpoint takes, and it is read from settings at call
+    // time. No key value is stored in this file.
     console.log("Sending TTS request to Zyphra API:", { ...requestData, speaker_audio: "[BASE64_DATA]" });
     
     updateTTSSorceryPlaybackUI();
@@ -989,6 +1077,10 @@ function preloadTtsSegment(index) {
     
     const audioData = voices[voiceId]?.audioFiles[audioVariant]?.file;
     if (!audioData) {
+        // This return skips the loadingSegments.delete that the API key
+        // check below does. The index stays in the set, so
+        // preloadTtsSegments treats this segment as still loading and
+        // never tries it again.
         console.error(`No audio file found for preload: ${segment.character}, variant: ${audioVariant}`);
         return;
     }
@@ -1011,6 +1103,13 @@ function preloadTtsSegment(index) {
 
     console.log(`Preloading TTS segment ${index+1}: ${segment.character} - ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`);
     
+    // Known bug, found by reading this function end to end: the request
+    // body below names requestData, and no requestData is ever built in
+    // this function. The only one in the file is a local inside
+    // loadAndPlaySegment, which this code cannot see. The fetch throws
+    // before any request is sent, so preloading never produces audio.
+    // Playback still works because loadAndPlaySegment builds its own
+    // body, including the ellipses padding this path also skips.
     fetch("https://api.zyphra.com/v1/audio/text-to-speech", {
         method: "POST",
         headers: {
@@ -1051,6 +1150,10 @@ function preloadTtsSegment(index) {
 }
 
 function getBase64AudioData(dataUrl) {
+    // Uploaded samples are stored as data URLs (see onVoiceFileChange).
+    // The API wants the payload without the data prefix, so I cut at the
+    // first comma. A value with no prefix is assumed to be raw base64
+    // already and passes through as it is.
     if (dataUrl.startsWith('data:')) {
         return dataUrl.split(',')[1];
     }
@@ -1064,6 +1167,10 @@ function mapEmotionsToZyphraFormat(ttsEmotions) {
     
     const zyphraEmotions = {};
     
+    // These e1 to e8 codes are the same ones the instruction template
+    // tells the model to emit. The template, this map, and
+    // formatEmotions each carry their own copy of the list, so adding
+    // an emotion means editing three places or the copies drift.
     const emotionMap = {
         'e1': 'happiness',
         'e2': 'sadness',
@@ -1085,12 +1192,22 @@ function mapEmotionsToZyphraFormat(ttsEmotions) {
     return zyphraEmotions;
 }
 
+// A swipe, an edit, or a delete makes any queued audio wrong, because
+// the text it was built from no longer exists in that form. I reset on
+// all three instead of trying to patch the queue.
 eventSource.on(event_types.MESSAGE_SWIPED, () => resetTtsQueue(true));
 eventSource.on(event_types.MESSAGE_EDITED, () => resetTtsQueue(true));
 eventSource.on(event_types.MESSAGE_DELETED, () => resetTtsQueue(true));
+// I register both spellings of the chat loaded event. Which constant a
+// host version exposes differs, and a double reset on load costs
+// nothing because resetExtensionState only clears state.
 eventSource.on(event_types.CHAT_LOADED, () => resetExtensionState());
 eventSource.on(event_types.chatLoaded, () => resetExtensionState());
 
+// Nothing in this file calls outputFormattedParagraph either. It is a
+// console pretty printer for parsed segments, from before playback
+// worked. I keep it because reading its output is still how I eyeball
+// what the parser did to a paragraph.
 function outputFormattedParagraph(text, markers) {
     if (!markers || markers.length === 0) {
         console.log(`Unknown type: ${text.trim()}`);
@@ -1195,6 +1312,11 @@ async function loadSettings() {
         extension_settings[extensionName] = {};
     }
     
+    // I copy the defaults in only when the object is entirely empty. A
+    // settings object holding one stale key blocks every other default,
+    // and the form reads further down paper over the gaps with ||
+    // fallbacks, which also means a stored empty string or zero can
+    // never be read back as itself.
     if (Object.keys(extension_settings[extensionName]).length === 0) {
         Object.assign(extension_settings[extensionName], defaultSettings);
     }
@@ -1359,6 +1481,13 @@ function switchTab(tabName) {
 }
 
 function addVoiceToUI(voiceId, voice) {
+    // The narrator never goes through this template in practice. It is
+    // built by hand in the settings HTML, and the rename and delete
+    // handlers refuse to touch it, because every fallback path in
+    // playback lands on the narrator voice. Other voices get a name
+    // field and a delete button here. The narrator branch of this
+    // template exists only so the function does not break if it is ever
+    // called with that id.
     const isNarrator = voiceId === 'narrator';
     const voiceItem = `
         <div class="TTSSorcery-voice-item" data-voice-id="${voiceId}">
@@ -1650,6 +1779,12 @@ function onVoiceFileChange(event) {
         };
     }
     
+    // I load the file into an Audio element first only to learn its
+    // duration. The bytes are read after loadedmetadata fires, so a
+    // file the browser cannot decode never reaches the settings object.
+    // What does reach it is a base64 data URL, and SillyTavern saves
+    // settings as JSON, so a long sample makes a large settings file.
+    // That is the cost of having no server side storage in this design.
     const audio = new Audio(URL.createObjectURL(file));
     
     console.log("Created audio element");
@@ -1762,6 +1897,12 @@ function onCounterInput(event) {
 }
 
 function refreshPresetList() {
+    // Known bug: defaultSettings has no presets key, so the fallback on
+    // the next line throws the first time this runs with no stored
+    // presets. It is hard to hit today, because the only callers are
+    // the preset button handlers in setupEventHandlers, and the
+    // settings HTML contains no preset buttons or list for them to bind
+    // to. The whole preset path is unreachable from the shipped screen.
     if (!extension_settings[extensionName].presets) {
         extension_settings[extensionName].presets = [defaultSettings.presets[0]];
     }
@@ -2347,6 +2488,10 @@ jQuery(async () => {
         $(document).on('click', '.mes_button_TTSSorcery', onTTSSorceryNarrateClick);
     }
     
+    // I know of no host event for "a message was rendered", so I poll
+    // once a second and add the wand button to any message block that
+    // lacks one. Inside the function, the off and on pair stops the
+    // click handler from stacking up again on every pass.
     setInterval(addTTSSorceryNarrateButtons, 1000);
 });
 
@@ -2377,6 +2522,11 @@ function addTTSSorceryToWandMenu() {
 function processMessageForTTS(messageText) {
     console.log("Processing message for TTS:", messageText.substring(0, 50) + "...");
     
+    // The extra processTtsQueue call after processSegments below looks
+    // like a duplicate, and mostly it is: processSegments already queues
+    // its segments and starts playback when idle. The second call only
+    // matters when playback was already running, where it kicks the
+    // preload path for the segments just added.
     resetTtsQueue(true);
     
     const markers = extractTTSInfo(messageText);
@@ -2431,6 +2581,12 @@ function updateTTSSorceryPlaybackUI() {
     }
 }
 
+// Nothing calls the two functions below, and the names they use
+// (audioJobQueue, audioQueueProcessorReady, audioPaused,
+// currentAudioJob, playAudioData, talkingAnimation) do not exist in
+// this file. They came over with code copied from a different TTS
+// implementation and were never wired to this queue. Calling either
+// one would throw on its first line.
 function processAudioJobQueue() {
     if (audioJobQueue.length == 0 || !audioQueueProcessorReady || audioPaused) {
         return;
@@ -2505,6 +2661,12 @@ function injectTTSSorceryRegexToRegexExtension() {
         return;
     }
     
+    // The find pattern below is the marker grammar from extractTTSInfo,
+    // written a second time as a string. The Regex extension uses its
+    // copy to strip markers out of the rendered chat, and this file
+    // uses the original to find the same markers for playback. If I
+    // change one copy and not the other, display and playback drift
+    // apart and nobody gets an error about it.
     const ttsSorceryRegex = {
         id: `ttssorcery-${Date.now()}`,
         scriptName: 'TTSSorcery TTS Markers',
@@ -2524,6 +2686,11 @@ function injectTTSSorceryRegexToRegexExtension() {
     console.log(`${extensionName}: Successfully injected TTSSorcery regex pattern into Regex extension.`);
 }
 
+// This binding runs at module load, before the settings HTML exists,
+// so it attaches to an empty selection and does nothing. The live
+// handler for this checkbox is onAutoGenerationInput, registered
+// inside the ready callback above. I leave this block where it is as a
+// record of the ordering trap, not as working wiring.
 $("#TTSSorcery_auto_generation").on("change", function() {
     extension_settings[extensionName].auto_generation = $(this).prop("checked");
     saveSettingsDebounced();

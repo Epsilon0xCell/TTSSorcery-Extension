@@ -1,3 +1,8 @@
+/* These class names are a contract with index.js. The settings HTML and
+   the voice templates in that file emit TTSSorcery- class names, and the
+   jQuery selectors look for exactly these. Renaming a class on one side
+   only leaves the panel unstyled and the handlers unable to find it. */
+
 .TTSSorcery-voice-item {
     margin-bottom: 15px;
     border: 1px solid var(--border-color);
@@ -27,6 +32,11 @@
     background-color: var(--accent-color);
 }
 
+/* I hide every tab panel, then show the api panel again with the rule
+   below, so the first paint opens on the API key tab. switchTab in
+   index.js overrides both rules with inline styles once the user
+   clicks, which means this pair only decides how the panel first
+   appears, never how it behaves after. */
 .TTSSorcery-tabs .tab-content {
     display: none;
 }
