@@ -66,7 +66,7 @@ This is included in every dialogue zonos tts generates
 This extension has lots of bugs and almost 80% depends on you having a smart model. The regex it uses to detect characters can break if the model isnt smart enough to put it in the right placing. This has only been tested with models like Claude 3.7, Claude 3.5, Claude Opus, Gemini Pro, Claude Haiku so keep that in mind. It also only works with chat completion for now.
 ## Repository notes (verified 2026-10-30)
 
-- This repo is the project9994 variant of TTSSorcery for SillyTavern. Files: index.js, style.css, manifest.json.
+- This repo is the TTSSorcery-Extension variant of TTSSorcery for SillyTavern. Files: index.js, style.css, manifest.json.
 - manifest.json declares js index.js and css style.css, and both files are present.
 - index.js passes node --check. It requires SillyTavern host modules (extensions.js, script.js, power-user.js, openai.js, lib.js), so it cannot run standalone outside SillyTavern.
 - The Zyphra API is called over HTTPS at https://api.zyphra.com/v1/audio/text-to-speech. Earlier revisions used plain HTTP, which would have sent the API key unencrypted.
