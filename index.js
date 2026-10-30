@@ -1008,6 +1008,11 @@ function preloadTtsSegment(index) {
     
     const apiKey = extension_settings[extensionName].api_key;
     if (!apiKey) {
+        console.error("No API key set for TTSSorcery preload");
+        loadingSegments.delete(index);
+        return;
+    }
+
     console.log(`Preloading TTS segment ${index+1}: ${segment.character} - ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`);
     
     fetch("http://api.zyphra.com/v1/audio/text-to-speech", {
