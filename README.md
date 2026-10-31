@@ -28,6 +28,7 @@ This is NOT integrated/compatible with sillytavern's built in text to speech, an
 - **Emotion control**: The ai automatically adds emotion values to dialogue, as Zonos model supports it
 - **Multiple languages**: Supports English, Japanese, Chinese, French, German, Korean
 - **Preloading**: Preloads audio segments so it doesn't pause for a long time mid generation
+- **Settings presets**: Save the model, language, speaking rate, voice quality score, and denoising choice under a name in the settings tab. Presets can be imported and exported as JSON files. Changing a setting updates the active preset.
 
 ## How do i use the extension
 
@@ -64,6 +65,16 @@ This is included in every dialogue zonos tts generates
 ## Issues
 
 This extension has lots of bugs and almost 80% depends on you having a smart model. The regex it uses to detect characters can break if the model isnt smart enough to put it in the right placing. This has only been tested with models like Claude 3.7, Claude 3.5, Claude Opus, Gemini Pro, Claude Haiku so keep that in mind. It also only works with chat completion for now.
+## Tests
+
+15 tests, run with Node's built in test runner:
+
+```
+node --test tests/index.test.mjs
+```
+
+index.js cannot load outside SillyTavern, so tests/harness.mjs loads it with the host modules stubbed and fetch recorded instead of sent. The tests cover marker parsing, narrator and character segment building, forced and unforced queue resets, the preload request body and its loading bookkeeping, preset seeding, emotion mapping, and the stream hook being removed instead of stacked on reinstall. Playback inside a real SillyTavern install is not covered by these tests.
+
 ## Repository notes (verified 2026-10-30)
 
 - This repo is the TTSSorcery-Extension variant of TTSSorcery for SillyTavern. Files: index.js, style.css, manifest.json.
@@ -71,3 +82,4 @@ This extension has lots of bugs and almost 80% depends on you having a smart mod
 - index.js passes node --check. It requires SillyTavern host modules (extensions.js, script.js, power-user.js, openai.js, lib.js), so it cannot run standalone outside SillyTavern.
 - The Zyphra API is called over HTTPS at https://api.zyphra.com/v1/audio/text-to-speech. Earlier revisions used plain HTTP, which would have sent the API key unencrypted.
 - Event handlers for CHAT_COMPLETION_PROMPT_READY and STREAM_TOKEN_RECEIVED are registered once. Earlier revisions registered them twice, which could inject instructions twice.
+- Completion pass (2026-10-31): narrator markers no longer throw on a missing emotions variable, preloading builds its own request body and clears its loading mark when a voice sample is missing, an unforced queue reset leaves playback alone instead of reading an undefined flag, the stream hook is removed on reset instead of being wrapped again, the preset controls exist in the settings tab with a seeded Default preset, and the copied audio job queue functions that referenced names from another implementation are gone.

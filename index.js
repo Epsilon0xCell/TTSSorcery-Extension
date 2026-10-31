@@ -30,7 +30,18 @@ const defaultSettings = {
     max_preload: 5,
     segment_gap: 0.5,
     auto_generation: false,
-    force_neutral_narrator: false
+    force_neutral_narrator: false,
+    presets: [
+        {
+            name: "Default",
+            model: "zonos-v0.1-hybrid",
+            language_iso_code: "en-us",
+            speaking_rate: 15,
+            vqscore: 0.78,
+            speaker_noised: false
+        }
+    ],
+    active_preset: "Default"
 };
 
 function generateCharacterList() {
@@ -119,6 +130,11 @@ function getCurrentInstructions() {
 
 let instructionsInjected = false;
 let hookInstalled = false;
+// The stream hook keeps the host callback and my wrapper so the hook
+// can be taken back out. Without these, a reset could only clear the
+// flag and the next install would wrap my own wrapper again.
+let originalOnProgressStreaming = null;
+let streamHookWrapper = null;
 
 // pageLoadTimestamp is written here and in resetExtensionState, and read
 // nowhere else in this file. It is leftover bookkeeping, not a gate that
@@ -265,19 +281,31 @@ function fixFormatting(text) {
     return processedText;
 }
 
+function uninstallStreamHook() {
+    // Put the host callback back, but only while mine is the one
+    // currently installed. If something else replaced it after me, I
+    // leave that alone and just clear my bookkeeping.
+    if (streamHookWrapper && streamingProcessor.onProgressStreaming === streamHookWrapper) {
+        streamingProcessor.onProgressStreaming = originalOnProgressStreaming;
+    }
+    originalOnProgressStreaming = null;
+    streamHookWrapper = null;
+    hookInstalled = false;
+}
+
 function installStreamHook() {
     // I wrap the host streaming callback instead of replacing it, and the
-    // wrapper calls the original at the end of every update. Known
-    // weakness: hookInstalled is reset by the generation started handler
-    // and by turning the extension off, but the wrapper itself is never
-    // removed. A reinstall wraps whatever callback is current, which may
-    // already be my wrapper, so the chain can grow across generations.
+    // wrapper calls the original at the end of every update. The wrapper
+    // is stored in streamHookWrapper so uninstallStreamHook can put the
+    // original back; a reset that only cleared the flag would leave my
+    // wrapper in place for the next install to wrap again.
     if (hookInstalled || !extension_settings[extensionName].enabled) return;
     if (!extension_settings[extensionName].auto_generation) return;
-    
+
     console.log(`${extensionName}: Installing stream hook`);
-    
-    const originalOnProgressStreaming = streamingProcessor.onProgressStreaming;
+
+    originalOnProgressStreaming = streamingProcessor.onProgressStreaming;
+    const originalOnProgressStreamingLocal = originalOnProgressStreaming;
     
     let lastProcessedLength = 0;
     
@@ -372,9 +400,10 @@ function installStreamHook() {
             allSegments = [];
         }
         
-        return originalOnProgressStreaming.call(this, messageId, text, isFinal);
+        return originalOnProgressStreamingLocal.call(this, messageId, text, isFinal);
     };
-    
+
+    streamHookWrapper = streamingProcessor.onProgressStreaming;
     hookInstalled = true;
 }
 
@@ -386,12 +415,11 @@ let loadingSegments = new Set();
 let currentPlayingSegmentIndex = -1;
 
 function resetTtsQueue(force = false) {
-    // Every caller in this file passes force as true, which short
-    // circuits the check on the next line. shouldPreserveTtsQueue is not
-    // defined anywhere in this file, so a bare resetTtsQueue() call
-    // would throw a ReferenceError. The preserve branch it was meant to
-    // guard does not exist yet.
-    if (force || !shouldPreserveTtsQueue) {
+    // A non-forced reset leaves the queue alone: the caller is saying
+    // playback may continue, so I log that and return. Every caller in
+    // this file that actually wants the queue cleared passes force as
+    // true.
+    if (force) {
         console.log("Resetting TTS queue and stopping playback");
 
         if (currentAudio) {
@@ -426,7 +454,7 @@ function resetExtensionState() {
     console.log("Completely resetting TTSSorcery extension state");
     resetTtsQueue(true);
     instructionsInjected = false;
-    hookInstalled = false;
+    uninstallStreamHook();
     pageLoadTimestamp = Date.now();
     lastProcessedMessageId = null;
 }
@@ -659,16 +687,14 @@ function processSegments(text, markers) {
                 }
             }
         } else {
-            // Known bug, found by reading this scope: there is no
-            // variable named emotions in processSegments, so the push
-            // below throws a ReferenceError for narrator markers
-            // instead of queueing the segment. The character and action
-            // branches above pass marker.emotions and do not hit this.
+            // Narrator markers land here. The segment takes its
+            // emotions from the marker, the same as the character and
+            // action branches above.
             segments.push({
                 type: marker.type,
                 character: marker.character,
                 voiceFile: marker.voiceFile,
-                emotions,
+                emotions: marker.emotions,
                 text: sanitizeText(segmentText),
                 chatId: currentChatId
             });
@@ -1077,11 +1103,11 @@ function preloadTtsSegment(index) {
     
     const audioData = voices[voiceId]?.audioFiles[audioVariant]?.file;
     if (!audioData) {
-        // This return skips the loadingSegments.delete that the API key
-        // check below does. The index stays in the set, so
-        // preloadTtsSegments treats this segment as still loading and
-        // never tries it again.
+        // Clear the loading mark before returning. Leaving the index in
+        // loadingSegments would make preloadTtsSegments treat this
+        // segment as still loading and never try it again.
         console.error(`No audio file found for preload: ${segment.character}, variant: ${audioVariant}`);
+        loadingSegments.delete(index);
         return;
     }
     
@@ -1102,14 +1128,40 @@ function preloadTtsSegment(index) {
     }
 
     console.log(`Preloading TTS segment ${index+1}: ${segment.character} - ${segment.text.substring(0, 30)}${segment.text.length > 30 ? '...' : ''}`);
-    
-    // Known bug, found by reading this function end to end: the request
-    // body below names requestData, and no requestData is ever built in
-    // this function. The only one in the file is a local inside
-    // loadAndPlaySegment, which this code cannot see. The fetch throws
-    // before any request is sent, so preloading never produces audio.
-    // Playback still works because loadAndPlaySegment builds its own
-    // body, including the ellipses padding this path also skips.
+
+    // I build the request body here, the same shape loadAndPlaySegment
+    // sends, instead of naming a variable from that function. The
+    // ellipses padding goes on a local copy of the text: the queued
+    // segment itself stays unpadded, so the playback path can pad it
+    // once if this preload never gets used.
+    let preloadText = segment.text;
+    if (preloadText) {
+        if (!preloadText.startsWith('...') && !preloadText.startsWith(' ...')) {
+            preloadText = '... ' + preloadText;
+        }
+        if (!preloadText.endsWith('...') && !preloadText.endsWith('... ')) {
+            preloadText = preloadText + ' ...';
+        }
+    }
+
+    const requestData = {
+        text: preloadText,
+        speaking_rate: extension_settings[extensionName].speaking_rate,
+        model: extension_settings[extensionName].model,
+        language_iso_code: extension_settings[extensionName].language_iso_code,
+        mime_type: "audio/webm",
+        speaker_audio: getBase64AudioData(audioData)
+    };
+
+    if (Object.keys(emotions).length > 0) {
+        requestData.emotion = emotions;
+    }
+
+    if (extension_settings[extensionName].model === "zonos-v0.1-hybrid") {
+        requestData.vqscore = extension_settings[extensionName].vqscore || 0.78;
+        requestData.speaker_noised = extension_settings[extensionName].speaker_noised;
+    }
+
     fetch("https://api.zyphra.com/v1/audio/text-to-speech", {
         method: "POST",
         headers: {
@@ -1287,7 +1339,7 @@ eventSource.on(event_types.STREAM_TOKEN_RECEIVED, installStreamHook);
 eventSource.on(event_types.GENERATION_STARTED, () => {
     console.log("Generation started, resetting state");
     instructionsInjected = false;
-    hookInstalled = false;
+    uninstallStreamHook();
 });
 
 eventSource.on(event_types.GENERATION_STOPPED, () => {
@@ -1347,9 +1399,18 @@ async function loadSettings() {
         };
     }
 
+    // Settings saved before presets existed have no presets key, and
+    // the defaults above only land on a fully empty object, so I seed
+    // the Default preset here as well. The preset handlers below push
+    // and splice this array and assume it exists.
+    if (!extension_settings[extensionName].presets) {
+        extension_settings[extensionName].presets = [{ ...defaultSettings.presets[0] }];
+        extension_settings[extensionName].active_preset = "Default";
+    }
+
     $("#TTSSorcery_enabled").prop("checked", extension_settings[extensionName].enabled || false);
     $("#TTSSorcery_api_key").val(extension_settings[extensionName].api_key || "");
-    $("#TTSSorcery_model").val(extension_settings[extensionName].model || "zonos-v0.1-transformer");
+    $("#TTSSorcery_model").val(extension_settings[extensionName].model || "zonos-v0.1-hybrid");
     $("#TTSSorcery_language_iso_code").val(extension_settings[extensionName].language_iso_code || "en-us");
     $("#TTSSorcery_speaking_rate").val(extension_settings[extensionName].speaking_rate || 15);
     $("#TTSSorcery_speaking_rate_value").val(extension_settings[extensionName].speaking_rate || 15);
@@ -1371,6 +1432,8 @@ async function loadSettings() {
     $("#TTSSorcery_segment_gap_value").val(extension_settings[extensionName].segment_gap || 0.5);
 
     $("#TTSSorcery_auto_generation").prop("checked", extension_settings[extensionName].auto_generation);
+
+    refreshPresetList();
 }
 
 function updateHybridSettings() {
@@ -1848,7 +1911,7 @@ function onEnabledInput(event) {
     extension_settings[extensionName].enabled = isEnabled;
     
     if (!isEnabled) {
-        hookInstalled = false;
+        uninstallStreamHook();
     }
     
     saveSettingsDebounced();
@@ -1897,14 +1960,12 @@ function onCounterInput(event) {
 }
 
 function refreshPresetList() {
-    // Known bug: defaultSettings has no presets key, so the fallback on
-    // the next line throws the first time this runs with no stored
-    // presets. It is hard to hit today, because the only callers are
-    // the preset button handlers in setupEventHandlers, and the
-    // settings HTML contains no preset buttons or list for them to bind
-    // to. The whole preset path is unreachable from the shipped screen.
+    // defaultSettings carries a Default preset, and the fallback below
+    // copies it (a copy, not the shared object, so editing the active
+    // preset never rewrites the defaults) the first time this runs with
+    // no stored presets.
     if (!extension_settings[extensionName].presets) {
-        extension_settings[extensionName].presets = [defaultSettings.presets[0]];
+        extension_settings[extensionName].presets = [{ ...defaultSettings.presets[0] }];
     }
     
     const presetNames = extension_settings[extensionName].presets.map(p => p.name);
@@ -2015,12 +2076,6 @@ function setupEventHandlers() {
 
     $('#TTSSorcery_api_key').on('input', function() {
         extension_settings[extensionName].api_key = $(this).val();
-        saveSettingsDebounced();
-    });
-
-    $('#TTSSorcery_seed').on('input', function() {
-        extension_settings[extensionName].seed = parseInt($(this).val());
-        updateCurrentPreset();
         saveSettingsDebounced();
     });
 
@@ -2440,6 +2495,19 @@ jQuery(async () => {
                             <small>Force narrator to use neutral emotions</small>
                         </label>
                     </div>
+
+                    <div class="flex-container flexFlowColumn">
+                        <label for="TTSSorcery_preset_list">Settings preset</label>
+                        <select id="TTSSorcery_preset_list" class="text_pole"></select>
+                        <div class="flex-container">
+                            <input id="TTSSorcery_preset_new" class="menu_button" type="button" value="New preset">
+                            <input id="TTSSorcery_preset_import" class="menu_button" type="button" value="Import">
+                            <input id="TTSSorcery_preset_export" class="menu_button" type="button" value="Export">
+                            <input id="TTSSorcery_preset_delete" class="menu_button" type="button" value="Delete">
+                            <input type="file" id="TTSSorcery_preset_import_file" accept="application/json" style="display:none;">
+                        </div>
+                        <small>A preset stores the model, language, speaking rate, voice quality score, and denoising choice from this tab. Changing a setting above updates the active preset.</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2581,37 +2649,6 @@ function updateTTSSorceryPlaybackUI() {
     }
 }
 
-// Nothing calls the two functions below, and the names they use
-// (audioJobQueue, audioQueueProcessorReady, audioPaused,
-// currentAudioJob, playAudioData, talkingAnimation) do not exist in
-// this file. They came over with code copied from a different TTS
-// implementation and were never wired to this queue. Calling either
-// one would throw on its first line.
-function processAudioJobQueue() {
-    if (audioJobQueue.length == 0 || !audioQueueProcessorReady || audioPaused) {
-        return;
-    }
-    try {
-        audioQueueProcessorReady = false;
-        currentAudioJob = audioJobQueue.shift();
-        playAudioData(currentAudioJob);
-        talkingAnimation(true);
-        updateTTSSorceryPlaybackUI();
-    } catch (error) {
-        toastr.error(error.toString());
-        console.error(error);
-        audioQueueProcessorReady = true;
-    }
-}
-
-function completeCurrentAudioJob() {
-    audioQueueProcessorReady = true;
-    currentAudioJob = null;
-    talkingAnimation(false);
-    updateTTSSorceryPlaybackUI();
-}
-
-
 function onTTSSorceryNarrateClick(event) {
     const messageBlock = $(event.target).closest('.mes');
     const messageId = messageBlock.attr('mesid');
@@ -2686,12 +2723,7 @@ function injectTTSSorceryRegexToRegexExtension() {
     console.log(`${extensionName}: Successfully injected TTSSorcery regex pattern into Regex extension.`);
 }
 
-// This binding runs at module load, before the settings HTML exists,
-// so it attaches to an empty selection and does nothing. The live
-// handler for this checkbox is onAutoGenerationInput, registered
-// inside the ready callback above. I leave this block where it is as a
-// record of the ordering trap, not as working wiring.
-$("#TTSSorcery_auto_generation").on("change", function() {
-    extension_settings[extensionName].auto_generation = $(this).prop("checked");
-    saveSettingsDebounced();
-})
+// The auto generation checkbox is wired by onAutoGenerationInput
+// inside the ready callback, where the settings HTML exists. A second
+// binding at module load would attach to an empty selection, so there
+// is none here on purpose.
