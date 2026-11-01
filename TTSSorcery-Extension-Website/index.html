@@ -3,164 +3,57 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TTSSorcery Extension: what it is, how it runs, where it stops</title>
-<meta name="description" content="TTSSorcery is an extension that can generate TTS with multiple speakers and emotions all in one message. Since it uses Sorcery&#x27;s method of executing a">
+<title>TTSSorcery-Extension: The Christmas Pickle and Other Tree Secrets</title>
+<meta name="description" content="A SillyTavern extension in three files that gives one streamed chat reply many voices at once, through speech markers and the Zyphra text to speech endpoint.">
 <style>
-:root {
-  --bg: #f0ead8; --panel: #faf6ea; --ink: #1e342c;
-  --mut: #ffffff;
-  --acc: #b26e28; --acc2: #ac362c;
-  --line: #faf6ea;
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.55; }
-code, pre, .mono { font-family: 'Consolas', monospace; }
-a { color: var(--acc2); }
-.hero { padding: 3rem 6vw 1rem; }
-.hero img.banner { width: 100%; height: auto; border: 1px solid var(--line);
-  border-radius: 10px; }
-.logo { width: 92px; height: 92px; border-radius: 18px;
-  border: 1px solid var(--line); }
-h1 { font-size: 2.4rem; margin: 0.4em 0 0.1em; }
-h2 { border-bottom: 2px solid var(--acc); padding-bottom: 0.2em;
-  margin-top: 2em; }
-.lede { font-size: 1.15rem; max-width: 62ch; }
-main { padding: 0 6vw 3rem; max-width: 1180px; margin: 0 auto; }
-.grid { display: grid; gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-.card { background: var(--panel); border: 1px solid var(--line);
-  border-radius: 12px; padding: 1rem 1.2rem; }
-.card.pop { animation: rise 0.7s ease both; }
-@keyframes rise { from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: none; } }
-pre.code { background: #101014; color: #e8e6df; padding: 1rem 1.2rem;
-  border-radius: 12px; overflow-x: auto; font-size: 0.86rem;
-  border-left: 5px solid var(--acc); }
-table { border-collapse: collapse; width: 100%; }
-td, th { border-bottom: 1px solid var(--line); padding: 0.45rem 0.6rem;
-  text-align: left; }
-.shots { display: grid; gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.shots img { width: 100%; height: auto; border: 1px solid var(--line);
-  border-radius: 10px; background: #f4f1e8; }
-footer { padding: 2rem 6vw; border-top: 1px solid var(--line);
-  color: var(--mut); }
-.rail { display: flex; gap: 1.2rem; align-items: flex-start; }
-.rail nav { position: sticky; top: 1rem; min-width: 180px; }
-@media (max-width: 760px) { .rail { flex-direction: column; }
-  .rail nav { position: static; } }
-@media (prefers-reduced-motion: reduce) {
-  .card.pop { animation: none; } * { scroll-behavior: auto; } }
+@font-face{font-family:'Arapey';src:url('fonts/Arapey.ttf') format('truetype');}
+@font-face{font-family:'Cabin';src:url('fonts/Cabin.ttf') format('truetype');}
+:root{--deep:#0d2417;--fir:#14351f;--bottle:#1e5631;--cran:#a31621;--darkred:#6d0f18;--gold:#c4943e;--cream:#f5eeda}
+*{box-sizing:border-box} body{margin:0;background:var(--deep);color:var(--cream);font-family:'Cabin',sans-serif;line-height:1.65}
+h1,h2{font-family:'Arapey',serif;font-weight:400;letter-spacing:.02em}
+.hero{padding:2rem 6vw 0;max-width:1000px;margin:0 auto}.hero img.banner{width:100%;height:auto}
+.logo{width:92px;height:92px}
+main{padding:0 6vw 3rem;max-width:1000px;margin:0 auto}
+.card{background:var(--cream);color:#1c2a1e;border-radius:6px 6px 18px 18px;padding:2.4rem 1.6rem 1.2rem;margin:2.6rem auto;position:relative;max-width:56rem}
+.card:before{content:'';position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:56px;height:22px;background:var(--cran);border-radius:4px}
+.card:after{content:'';position:absolute;left:14px;right:14px;bottom:9px;border-bottom:3px dotted var(--gold)}
+.card h2{margin-top:0;color:#5d0d15}
+.card.warn{background:var(--darkred);color:var(--cream)} .card.warn h2{color:var(--cream)}
+.sidenote{font-size:.85rem;color:#6d5a2e;border-top:1px solid #d8cba6;padding-top:.4rem}
+.card.warn .sidenote{color:#e8c9a0;border-top-color:#8d2430}
+.btn{display:inline-block;background:var(--bottle);color:var(--cream);font-family:'Arapey',serif;text-decoration:none;padding:.55rem 1.5rem;border-radius:46% 54% 52% 48%/58% 60% 40% 42%;position:relative;margin:.3rem .4rem .3rem 0;box-shadow:inset 0 6px 8px rgba(255,255,255,.28)}
+.btn:before{content:'';position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:14px;height:12px;border:3px solid var(--cran);border-radius:50%}
+.btn:hover{box-shadow:inset 0 6px 8px rgba(255,255,255,.28),inset 12px 0 18px rgba(232,184,75,.45)}
+.btn:active{transform:scaleY(.94)} .btn:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+a{color:#7d1a24} .card.warn a{color:#f0c987}
+a.lnk:before{content:'';display:inline-block;width:.6em;height:.85em;border:2px solid currentColor;border-radius:2px;margin-right:.4em;vertical-align:-.08em}
+a.lnk:hover:before{background:#e8b84b}
+.chain{display:flex;justify-content:center;gap:0;margin:1.6rem auto}
+.chain i{width:44px;height:24px;border:6px solid var(--cran);border-radius:50%;margin-left:-8px}
+.chain i:nth-child(3n+2){border-color:#2a7a3f}.chain i:nth-child(3n){border-color:var(--cream)}
+.chain i.open{border-right-color:transparent}
+code{background:rgba(20,53,31,.12);padding:.05em .35em;border-radius:3px} .card.warn code{background:rgba(0,0,0,.3)}
+pre{background:#0d2417;color:var(--cream);padding:1rem;overflow-x:auto;border-radius:6px}
+footer{padding:2rem 6vw;max-width:1000px;margin:0 auto}
 </style>
 </head>
-<body class="layout-ledger">
-<!-- This page exists for TTSSorcery-Extension alone: the layout (ledger),
-     the colors, and the type were picked for this project, not
-     shared with the other project pages. The code block below is
-     copied from the file it names, line for line. If it looks
-     plain, that is because the project is plain, and I would
-     rather the page match the project than dress it up. The one
-     thing I will not do here is oversell: what this project does
-     not do is stated on the page, not hidden from it. -->
+<body>
 <header class="hero">
-  <img class="logo" src="assets/logo.png" alt="TTSSorcery Extension logo">
-  <img class="banner" src="assets/banner.png" alt="">
-  <h1>TTSSorcery Extension</h1>
-  <p class="mono"><a href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">github.com/Epsilon0xCell/TTSSorcery-Extension</a></p>
+<img class="logo" src="assets/logo.png" alt="Glass pickle ornament on a cranberry ribbon loop">
+<img class="banner" src="assets/banner.png" alt="Christmas tree interior with the glass pickle hidden in the branches and the title on a gift tag">
+<h1>TTSSorcery-Extension</h1>
+<p>One streamed reply, many voices at once. The pickle is hidden in this tree on purpose: the extension hides its work inside the reply in the same way, as markers most readers scroll past.</p>
+<p><a class="btn" href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">Open the repo</a> <a class="btn" href="#limits">Honest limits</a></p>
 </header>
-
 <main>
-  <section class="rail">
-    <nav aria-label="on this page">
-      <p class="mono"><a href="#run">Run it</a><br>
-      <a href="#files">The files</a><br>
-      <a href="#sheets">The sheets</a><br>
-      <a href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">The repo</a></p>
-    </nav>
-    <div>
-      <p class="lede">TTSSorcery is an extension that can generate TTS with multiple speakers and emotions all in one message. Since it uses Sorcery&#x27;s method of executing actions the moment of the stream, that means TTS with multiple character voices with various audio variants/emotions can be genrated while the response</p>
-      <div class="grid">
-        <div class="card pop"><h3>What it is</h3>
-          <p>TTSSorcery Extension: 5 files, 2715 counted
-          lines across JavaScript 2531, CSS 109, Markdown 64. One job, done in the
-          open, in files you can read.</p></div>
-        <div class="card pop"><h3>The biggest piece</h3>
-          <p><code>index.js</code> carries the most
-          lines. If the project grows, that file is where the growth
-          lands first, for better or worse.</p></div>
-        <div class="card pop"><h3>The honest gap</h3>
-          <p>No test files yet. That is the honest gap, and the roadmap in the visuals folder says what the first one should cover.</p></div>
-      </div>
-      <section id="run">
-        <h2>Run it</h2>
-        <p>The repo README has the exact commands for this one. The
-        shape is the shape for most of my projects: clone it, read the
-        top file first so you know what will happen, then run it on
-        something you do not mind breaking.</p>
-        <p class="mono">$ git clone https://github.com/Epsilon0xCell/TTSSorcery-Extension.git<br>$ cd TTSSorcery-Extension</p>
-      </section>
-      
-  <section aria-label="real code">
-    <h2>The code, as it sits in the repo</h2>
-    <p>From <code>index.js</code>, line 27 on. I did
-    not tidy it for the page. What you see is what the file has.</p>
-    <pre class="code"><code>};
-
-function generateCharacterList() {
-    const voices = extension_settings[extensionName].voices;
-    if (!voices) return &#x27;&#x27;;
-
-    let characterList = [];
-    
-    for (const [voiceId, voice] of Object.entries(voices)) {
-        if (!voice?.audioFiles) continue;
-
-        const variants = Object.entries(voice.audioFiles)
-            .filter(([_, audio]) =&gt; audio &amp;&amp; audio.file !== null)
-            .map(([variantName, _]) =&gt; variantName);
-
-        if (variants.length &gt; 0) {
-            characterList.push(`${voice.name} - ${variants.map(v =&gt; `${v}.mp3`).join(&#x27;, &#x27;)}`);
-        }
-    }
-
-    return characterList.join(&#x27;\n&#x27;);
-}</code></pre>
-  </section>
-      <section id="files">
-        <h2>The files that matter</h2>
-        <table><tr><th>File</th><th>Lines</th></tr>
-        <tr><td><code>index.js</code></td><td>2531</td></tr>
-        <tr><td><code>style.css</code></td><td>109</td></tr>
-        <tr><td><code>README.md</code></td><td>64</td></tr>
-        <tr><td><code>manifest.json</code></td><td>11</td></tr>
-        <tr><td><code>LICENSE</code></td><td>0</td></tr>
-        </table>
-        <p>Names doing the work: <span class="mono">generateCharacterList, getCurrentInstructions, injectInstructions, extractTTSInfo, logTTSInfo, fixFormatting, installStreamHook, resetTtsQueue</span>.</p>
-      </section>
-      <section id="sheets">
-        <h2>Drawn by hand</h2>
-        <p>I sketch my projects on notebook paper so I have to
-        understand them well enough to draw them. The full set,
-        with the counts and how they were counted, is the
-        <a href="https://github.com/Epsilon0xCell/TTSSorcery-Extension/tree/main/TTSSorcery-Extension-Visuals">TTSSorcery-Extension-Visuals</a>
-        folder in the repo. Nothing is drawn over the binder holes.
-        That is a rule, not a style.</p>
-        <div class="shots">
-          <img src="assets/architecture.png" alt="Hand drawn architecture sheet for TTSSorcery Extension">
-          <img src="assets/flowchart.png" alt="Hand drawn flowchart sheet for TTSSorcery Extension">
-          <img src="assets/product-map.png" alt="Hand drawn product map sheet for TTSSorcery Extension">
-        </div>
-      </section>
-    </div>
-  </section>
+<div class="chain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<section class="card"><h2>What this is</h2><p>TTSSorcery is a SillyTavern extension in three files, <code>index.js</code>, <code>style.css</code>, and <code>manifest.json</code> version 1.0. It gives one streamed chat reply many voices at once. It is not part of, and does not work with, the text to speech built into SillyTavern, and it works with chat completions only, not text completion.</p><p class="sidenote">Card holds: the scope of the extension.</p></section>
+<section class="card"><h2>The marker at the centre</h2><p>An injected prompt asks the model to write speech markers into its reply, in the form <code>§c:Character|happy.mp3|e1:0.8§</code>, where the marker names who is speaking, which voice file or emotional variant to use, and an emotion value. The extension reads those markers as the reply streams, sends each segment to the Zyphra text to speech endpoint over HTTPS, and plays the returned audio in order, so a line is heard while the rest of the reply is still arriving. Preloading fetches later segments early so playback does not stall mid message.</p><p class="sidenote">Card holds: the marker, the stream, and the endpoint.</p></section>
+<div class="chain" aria-hidden="true"><i></i><i></i><i></i><i class="open"></i><i></i><i></i></div>
+<section class="card"><h2>Setup, branch by branch</h2><ol><li>Get a Zyphra API key, the free tier giving 100 minutes a month.</li><li>Put the key in the extension settings.</li><li>Upload at least one voice sample for the Narrator.</li><li>Add character voices as needed.</li><li>Enable the extension.</li></ol><p>Any audio sample can be uploaded to clone a voice. Samples of 10 to 30 seconds work best, noisy samples call for speaker denoising, and emotional variants such as happy, sad, or angry can be added without limit under names the model can match to context.</p><p class="sidenote">Card holds: key, Narrator sample, and variants.</p></section>
+<section class="card"><h2>The dials and the preset shelf</h2><p>Six languages are listed: English, Japanese, Chinese, French, German, and Korean. Emotion values run across eight named feelings: happiness, sadness, disgust, fear, surprise, anger, other, and neutral. Settings presets save the model, language, speaking rate, voice quality score, and denoising choice under a name, can be imported and exported as JSON, and change when a setting changes.</p><p>Tip, in plain type: pick the hybrid model over the transformer for better voice quality.</p><p class="sidenote">Card holds: languages, emotions, and presets.</p></section>
+<section class="card warn" id="limits"><h2>Use and honest limits</h2><p>Auto generation speaks new messages only while streaming is on. Manual generation starts from the wand icon in the menu, or the three dots on a message and then the wand. Playback can be toggled inside SillyTavern.</p><p>The warnings, unsoftened: the author calls the extension buggy, says about 80 percent of its success rests on having a capable model, and warns that the marker finding regular expression breaks when a model places markers badly. Testing is named narrowly: Claude 3.7, Claude 3.5, Claude Opus, Claude Haiku, and Gemini Pro. The extension cannot load outside SillyTavern at all.</p><p>Its 15 Node tests, run with <code>node --test tests/index.test.mjs</code>, load index.js against stubbed host modules and cover marker parsing, segment building, queue resets, the preload request body, preset seeding, and emotion mapping. Playback inside a real SillyTavern install is not covered by them.</p><p class="sidenote">Card holds: the bug warning, on dark red so it cannot be missed.</p></section>
 </main>
-<footer>
-  <p>TTSSorcery Extension is one of my projects. This page was written
-  from the repo itself on 2026-10-30: the counts are the
-  repo's counts, the code is the repo's code, and the gaps are the
-  repo's gaps.</p>
-</footer>
+<footer><p>The search is over and the pickle hangs on an outer branch now. Past the frame, a reply finishes speaking in several voices at once.</p></footer>
 </body>
 </html>

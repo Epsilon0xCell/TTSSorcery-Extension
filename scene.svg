@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" role="img" aria-label="Inside the tree: candle glows deep in the branches, the glass pickle at centre, a paper chain below">
+<rect width="1200" height="260" fill="#0a2013"/>
+<g fill="#ffb84d">
+<circle cx="180" cy="60" r="26" opacity=".25"><animate attributeName="opacity" values=".18;.38;.18" dur="11s" repeatCount="indefinite"/></circle>
+<circle cx="1020" cy="50" r="22" opacity=".25"><animate attributeName="opacity" values=".34;.16;.34" dur="13s" repeatCount="indefinite"/></circle>
+<circle cx="880" cy="90" r="18" opacity=".25"><animate attributeName="opacity" values=".2;.36;.2" dur="9s" repeatCount="indefinite"/></circle>
+</g>
+<g stroke="#123c22" stroke-width="5" fill="none"><path d="M0 70 L420 96"/><path d="M1200 64 L800 96"/><path d="M0 200 L460 178"/><path d="M1200 204 L760 180"/></g>
+<g>
+<ellipse cx="600" cy="118" rx="34" ry="62" fill="#1a5e32"/>
+<ellipse cx="588" cy="88" rx="7" ry="10" fill="#23703f"/><ellipse cx="612" cy="116" rx="6" ry="9" fill="#23703f"/><ellipse cx="590" cy="146" rx="6" ry="9" fill="#23703f"/>
+<ellipse cx="600" cy="30" rx="9" ry="11" fill="none" stroke="#9e1c26" stroke-width="4"/>
+<rect x="578" y="66" width="7" height="76" rx="3" fill="#dcffdc" opacity=".55"><animateTransform attributeName="transform" type="translate" values="0 0; 26 22; 0 44; 0 0" dur="16s" repeatCount="indefinite"/></rect>
+</g>
+<g><circle cx="452" cy="118" r="27" fill="#8f1622"/><circle cx="443" cy="109" r="6" fill="#ffffff" opacity=".3"><animateTransform attributeName="transform" type="rotate" values="-14 452 118; 14 452 118; -14 452 118" dur="21s" repeatCount="indefinite"/></circle></g>
+<g><circle cx="748" cy="118" r="27" fill="#a8853a"/><circle cx="739" cy="109" r="6" fill="#ffffff" opacity=".3"><animateTransform attributeName="transform" type="rotate" values="12 748 118; -12 748 118; 12 748 118" dur="24s" repeatCount="indefinite"/></circle></g>
+<g opacity=".5"><ellipse cx="0" cy="196" rx="52" ry="20" fill="#c49876"><animateTransform attributeName="transform" type="translate" values="-120 0; 1320 0" dur="47s" repeatCount="indefinite"/></ellipse></g>
+<g fill="none" stroke-width="7">
+<ellipse cx="330" cy="224" rx="26" ry="13" stroke="#9e1c26"><animate attributeName="cy" values="224;216;224" dur="7s" begin="0s" repeatCount="indefinite"/></ellipse>
+<ellipse cx="386" cy="228" rx="26" ry="13" stroke="#14532a"><animate attributeName="cy" values="228;220;228" dur="7s" begin="1.2s" repeatCount="indefinite"/></ellipse>
+<ellipse cx="442" cy="224" rx="26" ry="13" stroke="#eee4c4"><animate attributeName="cy" values="224;216;224" dur="7s" begin="2.4s" repeatCount="indefinite"/></ellipse>
+<ellipse cx="758" cy="224" rx="26" ry="13" stroke="#14532a"><animate attributeName="cy" values="224;216;224" dur="7s" begin="3.6s" repeatCount="indefinite"/></ellipse>
+<ellipse cx="814" cy="228" rx="26" ry="13" stroke="#d8c8aa"><animate attributeName="cy" values="228;220;228" dur="7s" begin="4.8s" repeatCount="indefinite"/></ellipse>
+<ellipse cx="870" cy="224" rx="26" ry="13" stroke="#9e1c26"><animate attributeName="cy" values="224;216;224" dur="7s" begin="6s" repeatCount="indefinite"/></ellipse>
+</g>
+</svg>
