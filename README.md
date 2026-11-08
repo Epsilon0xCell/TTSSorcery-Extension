@@ -1,10 +1,12 @@
-![Inside the tree at night, the pickle still hidden](intro-banner.png)
+![Intro scenery: a studio microphone and its round pop shield in close up with the red recording lamp lit behind it, and below the shield a cream script page carrying one violet marker band and faint blurred handwriting strokes standing in for the lines](intro-banner.png)
 
 
 
 # TTSSorcery
 
-![Wordmark banner: the title on a gift tag tied to the lowest branch](banner.png)
+![Wordmark banner: a small recording booth with one microphone at its centre and a stand of script pages marked in wide bands of violet, amber and teal for different speakers, headphones hanging at the side and a small red recording lamp glowing](banner.png)
+
+<p align="center"><img src="logo.png" alt="TTSSorcery-Extension logo: a studio microphone with a round pop shield in a dark booth, a cream script page clipped beneath it marked with plain violet colour bars" width="200"></p>
 
 ![Animated scene](scene.svg)
 
