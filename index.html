@@ -3,57 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TTSSorcery-Extension: The Christmas Pickle and Other Tree Secrets</title>
-<meta name="description" content="A SillyTavern extension in three files that gives one streamed chat reply many voices at once, through speech markers and the Zyphra text to speech endpoint.">
+<title>TTSSorcery-Extension: The Voice Booth</title>
+<meta name="description" content="A SillyTavern extension that generates text to speech with multiple speakers and emotions inside a single message, voiced by Zyphra's API as the reply streams in.">
 <style>
-@font-face{font-family:'Arapey';src:url('fonts/Arapey.ttf') format('truetype');}
-@font-face{font-family:'Cabin';src:url('fonts/Cabin.ttf') format('truetype');}
-:root{--deep:#0d2417;--fir:#14351f;--bottle:#1e5631;--cran:#a31621;--darkred:#6d0f18;--gold:#c4943e;--cream:#f5eeda}
-*{box-sizing:border-box} body{margin:0;background:var(--deep);color:var(--cream);font-family:'Cabin',sans-serif;line-height:1.65}
-h1,h2{font-family:'Arapey',serif;font-weight:400;letter-spacing:.02em}
-.hero{padding:2rem 6vw 0;max-width:1000px;margin:0 auto}.hero img.banner{width:100%;height:auto}
-.logo{width:92px;height:92px}
-main{padding:0 6vw 3rem;max-width:1000px;margin:0 auto}
-.card{background:var(--cream);color:#1c2a1e;border-radius:6px 6px 18px 18px;padding:2.4rem 1.6rem 1.2rem;margin:2.6rem auto;position:relative;max-width:56rem}
-.card:before{content:'';position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:56px;height:22px;background:var(--cran);border-radius:4px}
-.card:after{content:'';position:absolute;left:14px;right:14px;bottom:9px;border-bottom:3px dotted var(--gold)}
-.card h2{margin-top:0;color:#5d0d15}
-.card.warn{background:var(--darkred);color:var(--cream)} .card.warn h2{color:var(--cream)}
-.sidenote{font-size:.85rem;color:#6d5a2e;border-top:1px solid #d8cba6;padding-top:.4rem}
-.card.warn .sidenote{color:#e8c9a0;border-top-color:#8d2430}
-.btn{display:inline-block;background:var(--bottle);color:var(--cream);font-family:'Arapey',serif;text-decoration:none;padding:.55rem 1.5rem;border-radius:46% 54% 52% 48%/58% 60% 40% 42%;position:relative;margin:.3rem .4rem .3rem 0;box-shadow:inset 0 6px 8px rgba(255,255,255,.28)}
-.btn:before{content:'';position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:14px;height:12px;border:3px solid var(--cran);border-radius:50%}
-.btn:hover{box-shadow:inset 0 6px 8px rgba(255,255,255,.28),inset 12px 0 18px rgba(232,184,75,.45)}
-.btn:active{transform:scaleY(.94)} .btn:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
-a{color:#7d1a24} .card.warn a{color:#f0c987}
-a.lnk:before{content:'';display:inline-block;width:.6em;height:.85em;border:2px solid currentColor;border-radius:2px;margin-right:.4em;vertical-align:-.08em}
-a.lnk:hover:before{background:#e8b84b}
-.chain{display:flex;justify-content:center;gap:0;margin:1.6rem auto}
-.chain i{width:44px;height:24px;border:6px solid var(--cran);border-radius:50%;margin-left:-8px}
-.chain i:nth-child(3n+2){border-color:#2a7a3f}.chain i:nth-child(3n){border-color:var(--cream)}
-.chain i.open{border-right-color:transparent}
-code{background:rgba(20,53,31,.12);padding:.05em .35em;border-radius:3px} .card.warn code{background:rgba(0,0,0,.3)}
-pre{background:#0d2417;color:var(--cream);padding:1rem;overflow-x:auto;border-radius:6px}
-footer{padding:2rem 6vw;max-width:1000px;margin:0 auto}
+@font-face{font-family:'Chonburi';src:url('fonts/Chonburi-400.woff2') format('woff2');font-weight:400}
+@font-face{font-family:'Merriweather';src:url('fonts/Merriweather-400.woff2') format('woff2');font-weight:400}
+@font-face{font-family:'Merriweather';src:url('fonts/Merriweather-700.woff2') format('woff2');font-weight:700}
+@font-face{font-family:'Merriweather';src:url('fonts/Merriweather-900.woff2') format('woff2');font-weight:900}
+:root{--booth:#201d22;--booth2:#2c2830;--cream:#faf3e0;--card:#fffaf0;--ink:#33302a;--violet:#7c4d9e;--violetdk:#5d387b;--red:#c23b2e;--line:#e2d5b8}
+*{box-sizing:border-box} body{margin:0;background:var(--booth);color:var(--ink);font-family:'Merriweather',serif;line-height:1.7}
+h1,h2{font-family:'Chonburi',serif;color:var(--violetdk);font-weight:400}
+.hero{background:linear-gradient(170deg,#17141a 0%,var(--booth) 60%,var(--booth2) 100%);padding:2.2rem 6vw 1.8rem}
+.hero .inner{max-width:1020px;margin:0 auto}
+.hero img.wide{width:100%;height:auto;display:block;border:6px solid var(--cream);border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.hero .row{display:flex;gap:1.1rem;align-items:flex-start;margin-top:1.2rem}
+.hero .row img{width:92px;height:92px;object-fit:cover;border-radius:6px;border:3px solid var(--cream);background:var(--cream)}
+.hero h1{margin:.1rem 0 .3rem;font-size:2.4rem;color:#f6ead0}
+.hero p{max-width:44rem;color:#e8dcc2}
+main{padding:0 6vw 3rem;max-width:1020px;margin:0 auto}
+.page{background:var(--card);border:1px solid var(--line);border-top:8px solid var(--violet);border-radius:4px;padding:1.2rem 1.5rem;margin:1.6rem 0;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.page.red{border-top-color:var(--red)}
+.page h2{margin:.1rem 0 .5rem;font-size:1.7rem}
+.page p{margin:.4rem 0}
+.strip{background:#17141a;color:#f0e7cf;padding:1rem 1.2rem;overflow-x:auto;font-family:ui-monospace,Menlo,monospace;border-radius:4px;border-top:8px solid var(--red)}
+.btn{display:inline-block;background:var(--red);color:#fff6ec;font-family:'Merriweather',serif;font-weight:700;text-decoration:none;padding:.55rem 1.1rem;border-radius:999px;margin:.3rem .4rem .3rem 0}
+.btn:hover{background:#9c2d23;color:#fff6ec}.btn:active{transform:translateY(2px)}
+.btn:focus-visible{outline:2px dashed var(--violet);outline-offset:3px}
+a{color:var(--violetdk);font-weight:700}
+ol{margin:.4rem 0;padding-left:1.3rem}ul{margin:.4rem 0;padding-left:1.2rem}li{margin:.3rem 0}
+table{border-collapse:collapse}td{padding:.2rem .9rem .2rem 0;vertical-align:top}
+td:first-child{font-weight:900;color:var(--violetdk);white-space:nowrap}
+.small{font-size:.92rem}
+footer{padding:0 6vw 2.5rem;max-width:1020px;margin:0 auto;color:#9a8f78}
 </style>
 </head>
 <body>
 <header class="hero">
-<img class="logo" src="assets/logo.png" alt="Glass pickle ornament on a cranberry ribbon loop">
-<img class="banner" src="assets/banner.png" alt="Christmas tree interior with the glass pickle hidden in the branches and the title on a gift tag">
-<h1>TTSSorcery-Extension</h1>
-<p>One streamed reply, many voices at once. The pickle is hidden in this tree on purpose: the extension hides its work inside the reply in the same way, as markers most readers scroll past.</p>
-<p><a class="btn" href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">Open the repo</a> <a class="btn" href="#limits">Honest limits</a></p>
+<div class="inner">
+<img class="wide" src="assets/intro-banner.png" alt="A studio microphone and its round pop shield in close up with the red recording lamp lit behind it, and below the shield a cream script page carrying one violet marker band and faint blurred handwriting strokes standing in for the lines">
+<div class="row"><img src="assets/logo.png" alt="TTSSorcery-Extension logo: a studio microphone with a round pop shield in a dark booth, a cream script page clipped beneath it marked with plain violet colour bars"><div><h1>TTSSorcery-Extension</h1><p>A SillyTavern extension that generates text to speech with multiple speakers and emotions inside a single message. One page, many voices: an injected prompt marks up the reply as it is written, one band per character, and the extension voices each band through Zyphra's API the moment it streams in rather than reading the message afterwards.</p><p><a class="btn" href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">Open the repo</a> <a class="btn" href="#proof">The tests</a></p></div></div>
+</div>
 </header>
 <main>
-<div class="chain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-<section class="card"><h2>What this is</h2><p>TTSSorcery is a SillyTavern extension in three files, <code>index.js</code>, <code>style.css</code>, and <code>manifest.json</code> version 1.0. It gives one streamed chat reply many voices at once. It is not part of, and does not work with, the text to speech built into SillyTavern, and it works with chat completions only, not text completion.</p><p class="sidenote">Card holds: the scope of the extension.</p></section>
-<section class="card"><h2>The marker at the centre</h2><p>An injected prompt asks the model to write speech markers into its reply, in the form <code>§c:Character|happy.mp3|e1:0.8§</code>, where the marker names who is speaking, which voice file or emotional variant to use, and an emotion value. The extension reads those markers as the reply streams, sends each segment to the Zyphra text to speech endpoint over HTTPS, and plays the returned audio in order, so a line is heard while the rest of the reply is still arriving. Preloading fetches later segments early so playback does not stall mid message.</p><p class="sidenote">Card holds: the marker, the stream, and the endpoint.</p></section>
-<div class="chain" aria-hidden="true"><i></i><i></i><i></i><i class="open"></i><i></i><i></i></div>
-<section class="card"><h2>Setup, branch by branch</h2><ol><li>Get a Zyphra API key, the free tier giving 100 minutes a month.</li><li>Put the key in the extension settings.</li><li>Upload at least one voice sample for the Narrator.</li><li>Add character voices as needed.</li><li>Enable the extension.</li></ol><p>Any audio sample can be uploaded to clone a voice. Samples of 10 to 30 seconds work best, noisy samples call for speaker denoising, and emotional variants such as happy, sad, or angry can be added without limit under names the model can match to context.</p><p class="sidenote">Card holds: key, Narrator sample, and variants.</p></section>
-<section class="card"><h2>The dials and the preset shelf</h2><p>Six languages are listed: English, Japanese, Chinese, French, German, and Korean. Emotion values run across eight named feelings: happiness, sadness, disgust, fear, surprise, anger, other, and neutral. Settings presets save the model, language, speaking rate, voice quality score, and denoising choice under a name, can be imported and exported as JSON, and change when a setting changes.</p><p>Tip, in plain type: pick the hybrid model over the transformer for better voice quality.</p><p class="sidenote">Card holds: languages, emotions, and presets.</p></section>
-<section class="card warn" id="limits"><h2>Use and honest limits</h2><p>Auto generation speaks new messages only while streaming is on. Manual generation starts from the wand icon in the menu, or the three dots on a message and then the wand. Playback can be toggled inside SillyTavern.</p><p>The warnings, unsoftened: the author calls the extension buggy, says about 80 percent of its success rests on having a capable model, and warns that the marker finding regular expression breaks when a model places markers badly. Testing is named narrowly: Claude 3.7, Claude 3.5, Claude Opus, Claude Haiku, and Gemini Pro. The extension cannot load outside SillyTavern at all.</p><p>Its 15 Node tests, run with <code>node --test tests/index.test.mjs</code>, load index.js against stubbed host modules and cover marker parsing, segment building, queue resets, the preload request body, preset seeding, and emotion mapping. Playback inside a real SillyTavern install is not covered by them.</p><p class="sidenote">Card holds: the bug warning, on dark red so it cannot be missed.</p></section>
+<section class="page"><h2>How it works</h2><ol>
+<li>A prompt is injected to make the AI add special text to speech markers to the text: <code>§c:Character|happy.mp3|e1:0.8§</code></li>
+<li>These markers tell the extension who is speaking, which voice file to use, and in what emotion.</li>
+<li>The extension processes these markers and sends them to Zyphra's API, over HTTPS at api.zyphra.com/v1/audio/text-to-speech.</li>
+<li>Zyphra returns audio files that are played in order.</li>
+</ol><p>It uses the method and some code and prompts from <a href="https://github.com/p-e-w/sorcery">p-e-w/sorcery</a>, attributed in the repo. It is NOT integrated or compatible with SillyTavern's built in text to speech, and only works with chat completions for now.</p></section>
+<section class="page red"><h2>Set it up</h2><ol>
+<li>Get a Zyphra API key (the free tier gives 100 minutes a month).</li>
+<li>Add your API key in the extension settings.</li>
+<li>Upload at least one voice sample for the Narrator.</li>
+<li>Add character voices as needed.</li>
+<li>Enable the extension.</li>
+</ol><p>Voice samples of 10 to 30 seconds work best; avoid background noise in them, or enable speaker denoising.</p></section>
+<section class="page"><h2>Features</h2><ul>
+<li><strong>Voice cloning:</strong> upload any audio sample to clone voices for any character you want.</li>
+<li><strong>Audio variants:</strong> different emotional versions of a character's voice (happy, sad, angry, and so on), with no limit on how many you add.</li>
+<li><strong>Emotion control:</strong> the AI automatically adds emotion values to dialogue, as the Zonos model supports it.</li>
+<li><strong>Multiple languages:</strong> English, Japanese, Chinese, French, German, and Korean.</li>
+<li><strong>Preloading:</strong> audio segments preload so playback does not pause for a long time mid generation.</li>
+<li><strong>Settings presets:</strong> save the model, language, speaking rate, voice quality score, and denoising choice under a name; presets import and export as JSON files, and changing a setting updates the active preset.</li>
+</ul></section>
+<section class="page"><h2>The eight emotions</h2><table>
+<tr><td>1</td><td>Happiness</td><td>5</td><td>Surprise</td></tr>
+<tr><td>2</td><td>Sadness</td><td>6</td><td>Anger</td></tr>
+<tr><td>3</td><td>Disgust</td><td>7</td><td>Other</td></tr>
+<tr><td>4</td><td>Fear</td><td>8</td><td>Neutral</td></tr>
+</table><p>Every dialogue segment the extension generates carries one of these values.</p></section>
+<section class="page red"><h2>Using it</h2><ul>
+<li><strong>Auto generation:</strong> when enabled, TTS is generated for new messages automatically, as long as streaming is enabled.</li>
+<li><strong>Manual generation:</strong> click the wand icon in the menu, or the three dots on any message, then the wand.</li>
+<li><strong>Playback controls:</strong> toggle playback from inside SillyTavern.</li>
+</ul><p>Chat completions only, auto generation only while streaming is on, and a badly placed marker leaves a message silent.</p></section>
+<section class="page" id="proof"><h2>The tests</h2><div class="strip">node --test tests/index.test.mjs</div><p>15 tests, run with Node's built in test runner. index.js cannot load outside SillyTavern, so tests/harness.mjs loads it with the host modules stubbed and fetch recorded instead of sent. The tests cover marker parsing, narrator and character segment building, forced and unforced queue resets, the preload request body and its loading bookkeeping, preset seeding, emotion mapping, and the stream hook being removed instead of stacked on reinstall. Playback inside a real SillyTavern install is not covered.</p></section>
+<section class="page"><h2>The files</h2><p class="small"><code>index.js</code>, the extension. <code>manifest.json</code>, the extension manifest, declaring index.js and style.css. <code>style.css</code>, the extension styles. <code>tests/</code>, the harness and suite. <code>LICENSE</code>, the GNU General Public License v3. The full notes, including the recorded issues and the models it has been tested with, are in the <a href="https://github.com/Epsilon0xCell/TTSSorcery-Extension">repo README</a>.</p></section>
 </main>
-<footer><p>The search is over and the pickle hangs on an outer branch now. Past the frame, a reply finishes speaking in several voices at once.</p></footer>
+<footer><p>The red lamp is lit and the next coloured band on the page is waiting beneath the pop shield: the cast reads the message the moment it is written.</p></footer>
 </body>
 </html>
